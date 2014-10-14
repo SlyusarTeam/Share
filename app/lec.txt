@@ -1,0 +1,44 @@
+Работа с данными xml
+DOM/Pull/SAX - parse data
+SQLiteDatabase - for data storage
+ContentProvider - to share data
+
+Data flow:
+    putExtra(), getXXXExtra() - to deliver small data
+    Cursor c = getContentResolver().query() - read data from Content Provider
+    BaseAdapter, CursorAdapter - bind data on ListView
+
+Background operations:
+    Запуск при включении
+        (ACTION_BOOT_COMPLETED)
+
+    Background in Activity:
+        Raw thread(not recommended)
+        AsyncTask
+        Handler(on correct looper)
+        Loader(ICS+)
+
+    Background without Activity:
+        Service - starts in the same thread
+            IntentService - (simpler)
+                start in right thread
+                stops by himself
+                onHandleIntent
+
+
+Auto boot
+    on start(BOOT_COMPLETED)
+    on event(intent filter)
+    on custom time(AlarmManager)
+
+Inter Process Communication
+    Broadcast
+
+    ContentProvider
+
+
+<activity
+    android:WindowSoftInputMode = "" - when keyboard is open
+
+
+Toast
