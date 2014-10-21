@@ -56,6 +56,15 @@ public class Lecture extends ListActivity {
 
     }
 
+    public void delBtn(View view) {
+       // EditText editText = (EditText) findViewById(R.id.edit);
+        // adapter.add(editText.getText().toString());
+        list.remove(view.getId());
+        myAdapter.notifyDataSetChanged();
+        Toast.makeText(this,"deleted!",0).show();
+
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.

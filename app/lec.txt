@@ -42,3 +42,61 @@ Inter Process Communication
 
 
 Toast
+
+
+----------------------------------------------NEXT LECTURE----------------------------------
+Shared Preferences
+
+context.getCacheDir();
+
+Environment.getExternalDir();
+
+ContentProviders
+
+content:://my.application/data
+
+class A extends SQLiteOpenHelper {
+    A(Context context) {
+        super(context, "my_data.db", null, VERSION);
+    }
+    OnCreate(... db) {
+        db.execSQL("...");
+    }
+
+}
+
+/////
+db.getReadableDatabase();
+db.query(...); <-- selection, selectionArgs <- new String[] {year}
+"where tear < ?" + year;
+db.update(..)
+db.delete(...);
+db.insert(...);
+
+Cursor cursor = db.query();
+cursor.getColumnIndex("columnName");
+cursor.getInt(columnIndex);
+
+ResourseCursorAdapter
+
+SimpleCursorAdapter
+
+cursor.setNotificationUri(....);
+
+getContext().getContentResolver().notifyChange("...");
+
+extends ContentProvider{
+    UriMatcher matcher = new UriMatcher();
+    static {
+        matcher.addUri(AUTHORITY, "PATH", PATH_CODE);
+    }
+    "content://my.application"
+    "tablename"
+    query(Uri uri, ....) {
+
+    }
+
+}
+
+//clientCode
+Cursor cursor = getContentResolver().query("uri");
