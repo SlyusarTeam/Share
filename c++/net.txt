@@ -1,0 +1,304 @@
+IP - Internet protocol
+IP - adress 32 bit 192.168.3.118
+0.0.0.0 - any
+255.255.255.255 - bradcast - sen to all
+
+// local nets
+10.0.0.0 - 10.255.255.255 - ~ near 6 millions computers 24 bit
+192.168.00 - 192.168.255.255 - 16 bit
+172.16.0.0 - 172.31.255.255 - 20 bit
+
+//your pc
+127.0.0.0 - 127.255.255.255
+127.0.0.1 - your address
+
+
+Ethernet
+    MTU - Maximum transmission unit 1500 bytes
+
+//протоколы работающие поверх IP
+ICMP - Internet control message protocol    - need root rights to work with
+UDP - User datagram protocol
+    every computer has 65536 ports - UDP can send on custom port
+TCP - Transmission control protocol
+    65536 ports
+    
+              FIFO
+    client    ---->     server
+              <----
+              FIFO
+              
+    5 6 7  9 10 11 12 13
+           -------------
+    8 missed all packets after 7 will resent
+
+Nagle...
+
+BSD-socket
+UNIX domain socket - совсем другая вещь
+
+
+
+
+TCP EXAMPLE
+
+SERVER:             //ip - 10.0.0.1
+ s = socket(... SOCK_STREAM);
+ bind(s, local_addr) - addr can be 0.0.0.0:80 // 10.0.0.1:80
+ listen(s);
+ 
+ s1 = accept(s) // waits until someone connect
+ recv(s1);  // данные вроде как приходят в буффер, а мы из него берем - ?повисает когда буфер переполняется
+ send(s1);
+ close(s1);
+
+close(s);
+
+
+
+CLIENT:             //ip - 10.0.0.2
+ s = socket(... SOCK_STREAM);
+ connect(s, remote_address) //remote_addr = 10.0.0.1
+ 
+ recv(s)
+ send(s)
+
+
+close(s);
+
+
+
+
+UDP EXAMPLE
+
+SERVER:             //ip - 10.0.0.1
+ s = socket(... SOCK_DGRAM);
+ bind(s, "10.0.0.1:2539")
+
+ recv(s1); / recvfrom
+
+close(s);
+
+
+CLIENT:             //ip - 10.0.0.2
+ s = socket(... SOCK_DGRAM);
+ 
+ sendto(s)   // or write connect once and send();
+
+
+close(s)
+
+
+usual ports:
+    80: http
+    100: pop3
+    23: telnet
+    25: smpt
+    22: ssh
+    
+    
+224.0.0.0 - 239.255.255.255 - multicast diapason
+
+
+SO_REUSEADDR
+
+бывает подход - использовать по потоку на каждого клиента
+
+
+select
+    Недостатки:
+        получает битовую маску сокетов в которых мы заинтересованнны - размер маски константный - 1024
+        
+poll
+    в отличие от select получает массив переменного размера.
+    работает за n (скольок сокетов)
+    example:
+        vector<int> fds;
+        .
+        .
+        for(;;)
+        {
+            poll(fds, data(), fds.size())       //O(fds.size)
+        }
+
+epoll (Linux specific)          - in core
+    один раз передаем сокеты в которых мы заинтересованны
+    epoll_wait - O(1)
+    example:
+        for(;;)
+        {
+            epoll_event e;
+            int r = epoll_wait(epfd, &e, 1, -1)
+            if(r < 0)  error();
+                //socket_to_client[e.fd].handle(e);
+                if(epfd ==...)
+                    ...
+                else if(epfd == ...)
+                    ...
+                .
+                .
+                .
+        
+        
+        }
+
+timerfd // файловый дескриптор
+
+struct timer
+{
+    timer(io_service& ,int interval, function<void()>on_tick);
+    
+    ~timer();
+}
+
+struct ioservice
+{
+    void run();
+
+    private:
+        int epoll_fd;
+}
+
+//message loop
+io_service io;
+timer t(io,1000,[](){ cout << "hello\n";})
+io.run();
+
+
+WINDOWS:
+    I/O Completion Ports            //epoll analog
+
+
+reactor/proactor
+
+token = async_wait(io_service&, int, function<void()>);
+
+
+cancellation
+    token.cancel();
+    
+    
+
+IOCP    //(WINDOWS) analog epoll, proactor IO completion ports
+
+
+UNIX-signals:
+sigation
+
+SIGINT  ^C
+SIGTERM -kill yourself программа обрабатывает сама (может и не умереть)
+SIGKILL - убивает процесс(программа не может его обработать) (единств. процесс- init не убивается)
+SIGSEGV - нарушение сегментации
+SIGILL
+
+сигналы приходят асинхронно
+
+в обработчике нехорошо использовать многие вещи(ex: malloc, нетрив структуры данных)
+в обработчике можно использовать volatile/atomic - компилятор не оптимизирует работу с чтением/записью volatile
+    
+        
+        pipie
+
+signal handler      read
+write               epoll
+    
+    
+    
+    
+    
+///////////////////////////////////////////////////////////////
+    sig_handler         mainthread
+                pipe
+    write               epoll_
+   |-----------------|
+        signalfd
+socket
+pipe
+timerfd
+eventfd
+signalfd
+file
+    
+    
+
+File System     (String, inode*)
+    /home
+        /vi
+    /usr
+        /bin
+        
+    inode
+        ref_counter
+        date
+        size
+        location
+        
+        
+        
+
+                                            HTTP
+TCP
+
+----
+GET url http...
+key: value
+key: value
+.
+.
+                // empty line
+----
+
+answer:
+----
+key: value
+key: value
+.
+.
+        /// empty line
+...
+...
+...
+-----
+
+POST
+PUT
+DELETE
+
+// errors
+XSS - cross site-scripting
+CSRF - cross site request forgery
+
+proxy-server(cache)
+chat
+wget (recursive)
+pastebin
+работа с сетью асинхронно через epoll
+
+tcp - можно посмотреть QTcpServer, QTcpSocket (возможно QHTTP/QNetworkManager)
+
+
+optional <T>
+    optional<string> a;
+    a = "abc";
+    a = none;
+    if(a)
+        *a += "def";
+        
+        
+--------------------------
+|  |-------|             |
+--------------------------
+  |            |
+valid(bool)  data T
+
+
+template <typename T>
+struct optional
+{
+    bool valid;
+    char data[sizeof(T)];
+};
+
+
+Type erasure
+

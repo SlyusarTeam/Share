@@ -1,0 +1,322 @@
+Type Erasure
+
+тип  X
+типы: A   B   C
+      f   f   f
+будут иметь функцию f
+
+
+function<void()>  a = [x,y](){}
+
+
+any_iterator
+
+    vector<int>::iterator
+    list<int>::iterator
+    deque<int>::iterator
+    any_iterator<bidirectional> a = v.begin();
+    ++a;
+
+any
+
+    struct any
+    {
+        struct interface
+        {
+            virtual ~interface()
+            {}
+        };
+        template <typename T>
+        struct impl : interface
+        {
+            static char* get_static_tag();
+            char* set_tag;
+            T data
+        };
+        template <typename T>
+        any(T a): p(new impl<T>(a)){}
+        
+        template <typename T>
+        T* any_cast()
+        {
+            /*
+            if(auto *q = dynamic_cast<impl<T>*>(p.get()))
+                return &q->data;
+            else 
+                return null_ptr;
+            */
+             if(p->set_tag()==impl<T>::get_static_tag)
+                return &(impl<T>*)(p.get())->data;
+            else 
+                return null_ptr;
+        }
+        
+    private:
+        unique_ptr<interface> p;
+    };
+    
+    template<typename T>
+    char* any::impl<T>::get_static_tag()
+    {
+        static char tag;
+        return &tag;
+    }
+    
+    template <typename T>
+    char* any::impl<T>::set_tag()
+    {
+        return get_static_tag();
+    }
+    
+    
+RTTI - Runtime type information
+
+
+
+=================================================NEXT LEC=============================================
+
+
+variadic templates
+perfect forwarding      shared_ptr
+
+
+counter      |ref_counter|deleter|   --->        |obj|
+             ---------------------               -----
+                                                   ^
+                        ^       -------------------
+                        |     /
+                        |    /
+          shared_ptr   |p | q|
+                        ------
+
+
+
+struct mytype {
+    mytype(int,int);
+};
+
+optional<mytype> a;
+
+a = in_place(1,2);
+
+a = mytype(1,2);
+
+make_shared<mytype>(1,2);
+
+
+template <typename T>
+struct optional
+{
+    template<template InPlace>
+    optional& operator=(InPlace inplace)
+    {
+        destroy();
+        inplace.create<T>(data);
+        initialized = true;
+        ...
+    }
+}
+
+
+
+template<typename T, typename A1, typename A2>
+unique_ptr<T>   make_unique (A1 a1, A2 a2)
+{
+    return unique_ptr<T> (new T(a1,a2));
+}
+
+void f(unique_ptr<int>, unique_ptr<int>);
+
+f(unique_ptr<int>(new int(5))), unique_ptr<int>(new int(6)));
+
+f(make_unique<int>(5), make_unique<int>(6));
+
+
+--
+A1 h();
+A2 h2();
+
+void f(A1 const&, A2 const&);
+
+f(h1(),h2());
+
+template<typename A1, typename A2>
+void g(A1&& a1, A2&& a2)                    //  g(A1 a1, A2 a2)  bad - copies arguments;  &a1,&a2 - breaks g(h1(),h2());
+{
+    f(forward<A1>(a1), forward<A2>(a2))                    //f(a1,a2);
+}
+
+
+& & -> &
+& && -> &
+&& & -> &
+&& && -> &&
+
+A1->int& g(a);  //lvalue
+A1->int g(5);  //rvalue
+void(g&&)
+
+
+=======
+template <typename T>
+void print(T ... a)    // ... expands to many arguments
+{
+      f(a ...);           // deliver many a's to f
+
+      f(g(a...));         // f(g(a1,a2,a3,...,an));
+      f(g(a)..);         // f(g(a1),g(a2),...,g(an));
+}
+
+variant <T...>
+variant <T> ...
+
+
+template <typename T, typename ... Ts>
+void print(T a, Ts  ... as)                 // print all arguments      ex: print(5, 6.4, 'a');
+{
+    cout << a;
+    print(as...);
+}
+
+template <typename T>
+void print(T a)
+{
+    cout << a;
+}
+
+// ... can be written where you write x,x,x,x
+
+
+template <typename...T>
+struct x
+{
+    x();
+    T ... a;
+};
+
+
+template <template...T>
+x<T...>::x()
+    :a...(1,2,3)
+{}
+
+
+
+struct mytype
+{
+    mytype(int,int);
+    mytype()
+        :mytype(1,2)
+    {}
+
+}
+
+--------------------Namespaces--------------------
+
+namespace gnome
+{
+    void foo();
+    namespace panel
+    {
+        namespace application
+        {
+            void create_xxx();
+
+            void f()
+            {
+                create_xxx();
+            }
+        }
+        void g()
+        {
+            application::create_xxx();
+        }
+    }
+}
+
+using directive
+    using namespace gnome::panel;
+    application::create_xxx();
+    g();
+
+using declaration
+    using gnome::foo;
+    foo();
+
+
+namespace n1
+{
+    void x(int)
+    {
+    }
+    struct a;
+    struct b;
+}
+namespace n2
+{
+    void x(float)
+    {}
+    struct a;
+    struct c;
+}
+using n1::x;
+using n2::x;   // error if in n2 void x(int)
+
+using namespace n1;
+using namespace n2;
+a // error
+b // ok
+c // ok
+
+namespace app = gnome::panel::application;
+app:create_xxx();
+
+
+// не писать using directive в header'ах
+// in header write full names
+
+
+
+// 1.cpp
+
+#include <vector>
+
+struct mytype
+{
+    int a;
+};
+
+std::vector<mytype> a;
+
+//2.cpp
+#include <vector>
+struct mytype
+{
+    int a;
+    int b;
+};
+
+std::vector<mytype> b;
+//error
+
+
+//anonymous namespace
+namespace
+{
+    ...
+    ...
+}
+
+// same as
+namespace unique_name
+{
+
+}
+using namespace unique_name;
+
+---------------Modules------------------- // пока еще не доделанная фича языка
+Clang implements modules
+
+программа будет состоять только из .cpp
+
+каждый .cpp порождает объектный файл и module definition(бинарный header)
