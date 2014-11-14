@@ -68,7 +68,7 @@ class A extends SQLiteOpenHelper {
 /////
 db.getReadableDatabase();
 db.query(...); <-- selection, selectionArgs <- new String[] {year}
-"where year < ?" + year;
+"where tear < ?" + year;
 db.update(..)
 db.delete(...);
 db.insert(...);
@@ -101,26 +101,3 @@ extends ContentProvider{
 //clientCode
 Cursor cursor = getContentResolver().query("uri");
 
-=================================NEXT LECTURE======================
-1) Loaders
-
-Loader API
--LoaderManager
--LoaderManager.LoaderCallbacks
--Loader
--AsyncTaskLoader
--CursorLoader
-
-Using Loaders
--getLoaderManager().initLoader(0,null,this);
-
-
-android.amberfog.com/wp-content/uploads/2010/02/listview_recycler.jpg
-android.amberfog.com/?p=296
-
-
-new FileFilter(){
-	public boolean accept(File pathname){
-		return …;
-	}
-}

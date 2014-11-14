@@ -320,3 +320,594 @@ Clang implements modules
 программа будет состоять только из .cpp
 
 каждый .cpp порождает объектный файл и module definition(бинарный header)
+
+
+
+
+==========================================NEXT LECTURE==========================================
+1. Assert
+
+assert is a macros
+
+assert(a != 0);
+NDEBUG - асерт не вычисляет свой аргумент
+
+без NDEBUG асерт вычисляет свой аргумент и в случае если что не так вызывает std::abort
+
+-ex-
+#include <iostream>
+
+#define foo(x)
+std::cout << #x << "  = " << x;
+
+foo(bar) // std::cout<< "bar" << " = " << bar;
+
+--
+
+--debugbreak();
+    // int 3            //// - int это interrupt
+
+бывает еще подход когда асерт не завершает программу, а бросает exception
+
+2. logging
+
+        |-> slot s(appender)
+        |
+signals-|->
+
+
+---fuzzing---
+    способ автоматизации написания тестов - давать рандомизированные данные - обычно немного измененный валидный файл
+    csmith - генерит валидный c код - используется для тестирования
+    ffmpeg
+-------------
+
+----
+on gcc -g key for better debug information
+in release need to off debug information to prevet revers-engineering
+in debug off Optimizations -Oo or -Og
+-fno-omit-framepointer
+
+vtune - profiler // одобрен Сорокиным :)
+----
+
+3. Undefined behavior
+
+--
+void dot_product(float const* a, float const* b,size_t size, float* result)
+{
+    *result = 0.f;
+    for(size_t i = 0; i != size; ++i)
+        *result += a[i]*b[i];
+}
+
+--
+void cross_product(float const* a,float const* b, float* result)
+{
+    result[0] = a[1] * b[2] - a[2] * b[1];
+    result[1] = a[2] * b[0] - a[0] * b[2];
+    result[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+// LINPACK , LAPACK - FORTRAN very fast Libraies
+
+float const * restrict a, ... // restrict a - means a  not alias with other function arguments
+
+void add(float const* a,float const* b,size_t size, float* result)
+{
+    for(size_t i = 0; i!= size; ++i)
+        result[i] = a[i] + b[i];
+
+    /*  vectorized variant,   optimization can be only with restrict
+    for(size_t i = 0; i!= size; i += 2)
+    {
+        float r0 = a[i] + b[i];
+        float r1 = a[i + 1] + b[i + 1];
+        result[i] = r0;
+        result[i + 1] = r1;
+    }
+    */
+}
+
+
+--- в ядре линукса была такая уязвимость
+void f(int * a)
+{
+    int b,c,d,e;
+int e = *a; // e unused, разыменование 0 указателя запрещено -> компилятор выкидывает if, e unused -> эта строчка тоже вычеркивается -> trouble может случится обращение по 0 указателю
+    .
+    .
+    .
+    if(a != 0)
+    { }
+}
+
+---
+
+
+int a[10];
+    a[i] // gcc стали предпологать что i>= 0 && i < 10
+
+// но такой тест стал падать
+
+int a[100];
+int val = a[0];
+for(int i =0; i < 100; ++i, val = a[i])
+{
+
+}
+
+// gcc made:
+
+i = 0;
+while(true)
+{
+    if(i >= 100)    // (*)
+        break;
+    ++i;
+    val = a[i]; // i >= 0 && i < 100  -> (*) never true -> can delete (*) -> next optimizations -> trouble - empty cycle
+
+}
+
+
+-f sanitize = undefined - ключ компилятора, попытаться проверять undefined behavior, сильно замедляет программу
+-f sanitize = addres
+-f sanitize = memory
+
+
+assume - в релизе асерты заменяем на assume - позволяет компилятору предполагать true condition
+--assume(a > 5);
+ if (a > 4 ) // true
+
+assume(false) // unreachable - сюда управление никогда не приходит
+
+
+
+
+=====================================NEXT LECTURE==============================================
+1. Multithreading
+
+int account[1000];
+
+void transfer(size_t from, size_t to, int amount)
+{
+    if(amount < 0)
+        throw std::runtime_error("...");
+    if(account[from] < amount)
+        throw std::runtime_error("insufficient funds");
+    account[from] -= amount;        // если здесь программу прервут и запустят снова
+    account[to] += amount;          // (перевод с одного и того же счета)эту функцию
+                                    // запустят в еще одном потоке- trouble счет уйдет в минус
+}
+
+mutex - mutual exclusion
+    кусок кода который исполняется только одним потоком одновременно
+    lock
+    unlock
+
+--
+std::mutex m;
+int account[1000];
+
+void transfer(size_t from, size_t to, int amount)
+{
+    if(amount < 0)
+        throw std::runtime_error("...");
+    std::lock_guard<std::mutex> lg(m);    //m.lock();
+    if(account[from] < amount)
+        throw std::runtime_error("insufficient funds");
+    account[from] -= amount;
+    account[to] += amount;
+        //m.unlock();
+}
+--
+
+
+Amdahl law
+-------------
+|  S  |   P |       P - parallel part
+-------------
+
+
+--
+std::mutex m[1000];
+int account[1000];
+
+void transfer(size_t from, size_t to, int amount)
+{
+    if(amount < 0)
+        throw std::runtime_error("...");
+    std::lock_guard<std::mutex> lg1(m[from]);      // проблема если переводим с 1 на 2 и
+    std::lock_guard<std::mutex> lg2(m[to]);        // одновременно с 2 на 1 -  deadlock
+    if(account[from] < amount)                     //
+        throw std::runtime_error("insufficient funds");
+    account[from] -= amount;
+    account[to] += amount;
+
+}
+--
+
+--mutex pseudocode
+
+struct mutex
+{
+    mutex() : locked(false)
+    {}
+    void lock()
+    {
+        bool tmp = true;
+        do
+        {
+            atomic(locked,tmp);
+        }while(tmp);
+    }
+    void unlock()
+    {
+        locked = false;
+    }
+private:
+    bool locked;
+};
+
+void atomic_swap(bool& a, bool& b);
+
+это spin_lock - жрет процессорное время
+--
+
+решение deadlock    // from != to
+std::lock_guard<std::mutex> lg1(m[min(from,to)]);
+std::lock_guard<std::mutex> lg2(m[max(from,to)]);
+
+mutex has function try_lock
+
+std::lock(...);
+
+recursive_mutex
+    если наш поток уже лочил этот мьютекс, мы можем лочить его опять
+
+boost::shared_mutex (readwrite lock)
+
+
+-- flexible arrays
+struct mytype
+{
+    int a;
+    int b;
+    int c;
+    char d[];
+};
+--
+
+mutex fairness
+
+mutex is fair if mutex don't discriminate some threads under other (lock will happen if other threads make unlock)
+
+    (1reader)    (writer)    (2reader)
+shared_lock() , lock() , shared_lock()
+
+fair mutex will give lock to writer before 2reader
+
+struct concurent_queue
+{
+    void push(int val)
+    {
+        lock_guard<mutex> lg(m);
+        queue.push_back(val);
+        cv.notify_all();        // notify_one faster
+    }
+    bool try_pop(int& val)
+    {
+        lock_guard<mutex> lg(m);
+        if(queue.empty())
+            return false
+        val = queue.front();
+        queue.pop_front();
+        return true;
+    }
+
+    /*
+    int pop()
+    {
+        unique_lock<mutex> lg(m);
+        /* (1)
+        while(queue.empty())
+        {
+            //lg.unlock();
+                // if here another thread make push - bad - queue have 1 element but pop waits for second  so there is no void wait(), only (*)
+            //cv.wait();
+
+            cv.wait(lg);
+            lg.lock();
+        }
+        */(1)
+
+        cv.wait(lg,[this]{return queue.empty();}); // вместо (1)
+
+
+        int val = queue.front
+        queue.pop_front();
+        cv.notify_one(); //+
+        return val;
+    }
+    */
+
+private:
+    deque<int> queue;
+    mutex m;
+    conditional_variable cv;
+
+};
+
+
+struct condition_variable
+{
+    //void wait();
+    void wait(unique_lock<mutex>&);// (*)
+    void notify_one();
+    void notify_all();
+};
+
+
+
+
+std::atomic<int> a;
+a.load();
+a.store(5);
+
+concensus task ?
+
+функция запущенна в n потоках на вход н чисел
+какие то потоки могут быть убиты, все потоки должны вернуть одно и то же число(одно из входных чисел)
+
+concensus number:
+read 1
+write 1
+swap 2
+cas infinity
+-- with swap
+int x;
+int f(int b)
+{
+    int tmp = b;
+    swap(x, tmp);
+    if(tmp == 0)
+        return b;
+    else
+        return tmp;
+}
+--
+
+
+-- запуск потока
+std::thread a([](){});
+a.join();// дождаться пока поток выйдет
+a.detach();
+
+volatile int a - not for atomic operations it says to compiler not to optimize
+
+relaxed memory ordering
+
+sequential consistent
+
+
+a.load(memory.order_relaxed);
+a.store(5, memory.order_relaxed)
+                        // relaxed, consume, release, acqrel, seqcst
+
+=====================================NEXT LECTURE===============================================
+
+
+задача: посчитать что то только один раз, но при этом только один поток должен это посчитать
+-- Вот так #НЕНАДОДЕЛАТЬНИКОГДА
+{
+//if(!initialized)       // такая проверка тоже некорректна
+lock_guard lg(m);       // lg берется всегда - плохо
+    if(!initialized)
+        init();
+return
+}
+---
+
+once_flag a;
+{
+    call_once(a,[]{...});
+}
+
+// in c++11 it is thread safe code:
+mytype& instance()
+{
+    static mytype a(...);
+    return a;
+}
+
+--------------
+thread_local int a;  // своя копия a для каждого потока, адрес а у каждого потока свой
+
+--thread int a;
+--declspec(thread) int a;
+
+-----------------
+int& instance();
+
+int calc()
+{
+    return instance();
+}
+
+int& instance()
+{
+    static int a = calc(); // при инициализации статик переменной мы рекурсивно обращаемся к ней -  undefined behaviour
+    return a;   // разные компиляторы ведут себя по разному MS - выдаст 0, clang - infinite recursion, gcc -  exception
+}
+int main()
+{
+    cout << instance();
+}
+-------------------
+
+если мы вызываем другую функцию удерживая mutex, может получиться deadlock
+если мы используем mutexы and cond_var, то при входе в каждую функцию нужно знать какие мьютексы уже удержаны
+особенно плохо вызывать сигналы удерживая mutex
+программы использующие мьютексы плохо композируются
+
+--------------------
+попробуем без mutex
+
+std::transform          |a1|a2|a3|...|an|
+                                |
+
+                        |f(a1)|f(a2)|..|f(an)|
+
+std::accumulate     |a1|a2|...|an| -> a1*a2*...*an  // (a1*a2)*a3 = a1*(a2*a3)
+quick_sort после разбиения можно запускать в отдельном потоке
+
+fork-join parallelism
+
+TBB - библиотека параллельных функций
+
+------------------------------------
+thread pool
+
+есть очередь задач
+         <-|  _ _ _ _ _
+         <-|-| | | | | |<- std::function<void()>
+         <-|  - - - - -
+
+// если куча потоков будут инкрементить один и тот же счетчик, это будет даже медленне чем из одгного потока
+
+заведем в пулле n очередей
+каждый поток выгребает из своей очереди
+
+если задачу в пулл кладет поток из самого пулла, то обычно задача кладется в очередь этого потока
+work stealing - если потоку нечего делать, то тогда он пробегается по другим очередям и берет из конца очереди
+
+
+проблемы с пуллом могут возникнуть, если задачи могут повисать
+
+--
+mutex m;
+condition_variable cv;
+bool finished = false;
+
+std::thread th([&]{
+...
+/* непонятно нужные ли строчки, Ваня стер их
+lock_guard<mutex> lg(m);
+finished = true;
+cv.notify_one();
+*/
+
+})
+
+th.join();
+
+unique_lock<mutex> lg(m);
+cv.wait(lg,[&]{
+
+})
+
+
+
+допустим в пулле две очереди по 4
+если в пулл одновременно добавят две цепочки задач по 5 зависимых задач - может получится дедлок
+
+thread pool обычно имеет смысл только если потоки создаются долго
+
+
+std::future<int> f = std::async([]{return 42;} /*, async/deferred/ async|deferred(default)*/) - ипользует thread pool
+
+int r = f.get() // если  еще не посчиталось, то повиснет
+// async|deferred если в пулле уже посчиталось или кем то считается - подождем иначе уберем из пулла и посчитаем прямо тут
+
+--  помогает контроллировать порядок выполнения
+packaged_task p([]{return 42;}); // дадим p какому то другому потоку //  p(); когда вызовут - посчитается
+
+auto f = p.get_future();
+f.get();
+
+---- низкоуровнеый механизм
+std::promise<int> p;
+
+p.set_value(...);
+p.set_exception(...);
+p.get_future().get();
+-----
+
+проблема с async
+если у нас deferred/async|deferred
+
+lock m;
+lock m2;
+...
+f.get(); //когда вычисление начнется здесь, а мы залочили мьютексы - плохо
+
+----------
+coroutines // пока coroutines -  библиотечные
+fiber, ucontext, Boost.Context
+функции которые имеют несколько точек входа
+
+fcontext main, inner;
+
+void f(intptr_t)
+{
+    cout << "a \n";
+    jump(&main,&inner,0); // получает куда мы переключаемся, куда сохранить текущее состояние
+    cout << "b \n";
+    jump(&main,&inner,0);
+    cout << "c\n";
+    jump(&main,&inner,0);
+}
+
+int main()
+{
+    make_fcontext(&inner,&f,0);
+    cout << "x\n";
+    jump(&inner,&main,0);
+    cout << "y\n";
+    jump(&inner,&main,0);
+    cout << "z\n";
+    jump(&inner,&main,0)
+}
+
+выведет:
+x
+a
+y
+b
+z
+c
+
+
+coroutines помогают делать генераторы
+coroutines вроде как намного быстрее потоков
+// bst обходим все дерево
+void visit(node* n, asymmetric_coroutine<int>::push_type& sink)
+{
+    if(n->left)
+        visit(n->left,sink);
+    sink(n->value);
+    if(n->right)
+        visit(n->right,sink);
+
+}
+
+asymetric_coroutine<int>::pull_type source([=](asymmetric_coroutine<int>::push_type& sink){
+    visit(tree,sink);
+});
+
+for(int values: source)
+    cout << values << " ";
+------------
+
+void do_read()
+{
+    async_read(...,do_write);
+}
+
+void do_write()
+{
+    async_write(...,do_read);ß
+}
+
+переключение в корутних занимает всего 20-40 тактов
+----
